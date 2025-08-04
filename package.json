@@ -1,0 +1,13 @@
+{
+  "name": "el-amigo-frontend",
+  "private": true,
+  "workspaces": [
+    "packages/mobile",
+    "packages/web",
+    "packages/shared-ui"
+  ],
+  "scripts": {
+    "test": "yarn workspace web test"
+  }
+}
+
