@@ -8,3 +8,5 @@ build/
 *.lock
 .idea/
 .DS_Store
+
+/generated/prisma
