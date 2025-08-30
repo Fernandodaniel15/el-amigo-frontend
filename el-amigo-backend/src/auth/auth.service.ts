@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
-import { UsersService } from '../users/users.service';
+import { PrismaService } from '../prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
@@ -7,26 +7,30 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
-  ) {}
+  constructor(private prisma: PrismaService, private jwt: JwtService) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.usersService.findByEmail(dto.email);
-    if (existing) throw new ConflictException('El usuario ya existe');
-    const hashed = await bcrypt.hash(dto.password, 12);
-    const user = await this.usersService.create({ ...dto, password: hashed });
-    const token = this.jwtService.sign({ sub: user.id, email: user.email });
-    return { user, token };
+    const exists = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (exists) throw new ConflictException('Email ya registrado');
+    const hash = await bcrypt.hash(dto.password, 12);
+    const user = await this.prisma.user.create({
+      data: { email: dto.email, password: hash, fullName: dto.fullName },
+    });
+    const token = this.jwt.sign({ sub: user.id, email: user.email });
+    return { user: { id: user.id, email: user.email }, token };
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersService.findByEmail(dto.email);
-    if (!user) throw new UnauthorizedException('Credenciales inválidas');
-    const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Credenciales inválidas');
-    const token = this.jwtService.sign({ sub: user.id, email: user.email });
-    return { user, token };
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (!user || !(await bcrypt.compare(dto.password, user.password)))
+      throw new UnauthorizedException('Credenciales inválidas');
+    const token = this.jwt.sign({ sub: user.id, email: user.email });
+    return { user: { id: user.id, email: user.email }, token };
+  }
+
+  refresh(token: string) {
+    const payload = this.jwt.verify(token);
+    const newToken = this.jwt.sign({ sub: payload.sub, email: payload.email });
+    return { token: newToken };
   }
 }

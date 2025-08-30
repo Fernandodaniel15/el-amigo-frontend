@@ -1,3 +1,4 @@
+// register.dto.ts
 import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
 
 export class RegisterDto {
@@ -5,9 +6,9 @@ export class RegisterDto {
   email: string;
 
   @IsNotEmpty()
-  @MinLength(8)
-  password: string;
+  fullName: string;    // ← Renombrado y validado
 
   @IsNotEmpty()
-  fullName: string;
+  @MinLength(6)
+  password: string;
 }
