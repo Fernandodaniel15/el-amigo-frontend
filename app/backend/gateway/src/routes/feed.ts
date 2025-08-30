@@ -24,6 +24,8 @@ export default async function feedRoutes(app: FastifyInstance) {
 
   // CREAR
   app.post<{ Body: { text?: string } }>('/feed', async (req, reply) => {
+    if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+
     const text = (req.body?.text ?? '').trim();
     if (!text) return reply.code(400).send({ message: 'texto vacío' });
     if (text.length > 500) return reply.code(400).send({ message: 'muy largo' });
@@ -32,6 +34,7 @@ export default async function feedRoutes(app: FastifyInstance) {
       id: randomUUID(),
       text,
       createdAt: new Date().toISOString(),
+      author: { id: req.user.id, name: req.user.name },
       comments: [],
     };
     await addItem(item);
@@ -42,20 +45,33 @@ export default async function feedRoutes(app: FastifyInstance) {
   app.put<{ Params: { id: string }, Body: { text?: string } }>(
     '/feed/:id',
     async (req, reply) => {
+      if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+
       const text = (req.body?.text ?? '').trim();
       if (!text) return reply.code(400).send({ message: 'texto vacío' });
 
-      const it = await updateItem(req.params.id, { text });
-      if (!it) return reply.code(404).send({ message: 'no existe' });
+      const current = await getById(req.params.id);
+      if (!current) return reply.code(404).send({ message: 'no existe' });
+      if (current.author?.id && current.author.id !== req.user.id) {
+        return reply.code(403).send({ message: 'forbidden' });
+      }
 
+      const it = await updateItem(req.params.id, { text });
       return { ok: true, item: it };
     }
   );
 
   // BORRAR
   app.delete<{ Params: { id: string } }>('/feed/:id', async (req, reply) => {
+    if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+
+    const current = await getById(req.params.id);
+    if (!current) return reply.code(404).send({ message: 'no existe' });
+    if (current.author?.id && current.author.id !== req.user.id) {
+      return reply.code(403).send({ message: 'forbidden' });
+    }
+
     const removed = await removeItem(req.params.id);
-    if (!removed) return reply.code(404).send({ message: 'no existe' });
     return { ok: true, item: removed };
   });
 
@@ -72,6 +88,8 @@ export default async function feedRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string }, Body: { text?: string } }>(
     '/feed/:id/comments',
     async (req, reply) => {
+      if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+
       const it = await getById(req.params.id);
       if (!it) return reply.code(404).send({ message: 'item no existe' });
 
@@ -79,7 +97,12 @@ export default async function feedRoutes(app: FastifyInstance) {
       if (!text) return reply.code(400).send({ message: 'texto vacío' });
       if (text.length > 300) return reply.code(400).send({ message: 'muy largo' });
 
-      const c: Comment = { id: randomUUID(), text, createdAt: new Date().toISOString() };
+      const c: Comment = {
+        id: randomUUID(),
+        text,
+        createdAt: new Date().toISOString(),
+        author: { id: req.user.id, name: req.user.name },
+      };
       await addComment(it.id, c);
       return { ok: true, comment: c };
     }
@@ -89,14 +112,25 @@ export default async function feedRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string, cid: string } }>(
     '/feed/:id/comments/:cid',
     async (req, reply) => {
-      try {
-        await removeComment(req.params.id, req.params.cid);
-        return { ok: true };
-      } catch (e: any) {
-        const msg = String(e?.message ?? 'error');
-        if (msg.includes('no existe')) return reply.code(404).send({ message: msg });
-        return reply.code(500).send({ message: 'error' });
+      if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+
+      const it = await getById(req.params.id);
+      if (!it) return reply.code(404).send({ message: 'item no existe' });
+
+      const comment = it.comments.find(c => c.id === req.params.cid);
+      if (!comment) return reply.code(404).send({ message: 'comentario no existe' });
+      if (comment.author?.id && comment.author.id !== req.user.id) {
+        return reply.code(403).send({ message: 'forbidden' });
       }
+
+      await removeComment(req.params.id, req.params.cid);
+      return { ok: true };
     }
   );
+
+  // util opcional: limpiar todo (no exponer en prod)
+  app.delete('/feed', async () => {
+    // si hiciera falta limpiar, podríamos setear [] en el json; omitido para seguridad.
+    return { ok: true };
+  });
 }

@@ -1,15 +1,16 @@
 // app/backend/gateway/src/store/feedStore.ts
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import type { User } from '../plugins/auth.js';
 
-export type Comment = { id: string; text: string; createdAt: string };
-export type Item = { id: string; text: string; createdAt: string; comments: Comment[] };
+export type Author = User; // { id, name }
+export type Comment = { id: string; text: string; createdAt: string; author?: Author };
+export type Item = { id: string; text: string; createdAt: string; author?: Author; comments: Comment[] };
 type DB = { items: Item[] };
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-// Cache en memoria para minimizar IO
 let cache: DB | null = null;
 let loading: Promise<void> | null = null;
 
@@ -24,15 +25,14 @@ async function loadOnce() {
     await ensureDataDir();
     try {
       const raw = await fs.readFile(DB_FILE, 'utf8');
-      cache = JSON.parse(raw) as DB;
-      if (!cache.items) cache.items = [];
+      const data = JSON.parse(raw) as DB;
+      cache = { items: Array.isArray(data.items) ? data.items : [] };
     } catch {
       cache = { items: [] };
       await fs.writeFile(DB_FILE, JSON.stringify(cache, null, 2), 'utf8');
     }
   })();
-  await loading;
-  loading = null;
+  await loading; loading = null;
 }
 
 async function save() {
@@ -40,8 +40,6 @@ async function save() {
   await ensureDataDir();
   await fs.writeFile(DB_FILE, JSON.stringify(cache, null, 2), 'utf8');
 }
-
-// ============ API que usan tus rutas ============
 
 export async function getAll(): Promise<Item[]> {
   await loadOnce();

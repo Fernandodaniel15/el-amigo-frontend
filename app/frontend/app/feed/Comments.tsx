@@ -1,11 +1,10 @@
-// app/frontend/app/feed/Comments.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiGet, apiPost, apiDelete } from '@/lib/http';
+import { apiGet, apiPost, apiDelete, apiMe } from '@/lib/http';
 
 type Props = { itemId: string };
-type Comment = { id: string; text: string; createdAt?: string };
+type Comment = { id: string; text: string; createdAt?: string; author?: {id:string; name:string} };
 
 export default function Comments({ itemId }: Props) {
   const [list, setList] = useState<Comment[]>([]);
@@ -13,6 +12,9 @@ export default function Comments({ itemId }: Props) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
+  const [me, setMe] = useState<{id:string; name:string} | null>(null);
+
+  useEffect(() => { apiMe().then(r=> setMe(r.user)); }, []);
 
   async function load() {
     try {
@@ -38,7 +40,11 @@ export default function Comments({ itemId }: Props) {
       setText('');
       await load();
     } catch (e: any) {
-      alert(e?.message ?? 'No se pudo comentar');
+      if (String(e?.message || '').includes('login')) {
+        alert('Iniciá sesión para comentar');
+      } else {
+        alert(e?.message ?? 'No se pudo comentar');
+      }
     } finally {
       setBusy(false);
     }
@@ -61,33 +67,34 @@ export default function Comments({ itemId }: Props) {
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #ddd' }}>
       <div style={{ fontWeight: 600, marginBottom: 6 }}>Comentarios</div>
 
-      {/* Nuevo comentario */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Escribí un comentario…"
+          placeholder={me ? "Escribí un comentario…" : "Logueate para comentar"}
+          disabled={!me}
           style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
         />
-        <button disabled={busy || !text.trim()} onClick={onAdd}>
+        <button disabled={busy || !text.trim() || !me} onClick={onAdd}>
           Agregar
         </button>
+        {!me && <a href="/login">Login</a>}
       </div>
 
-      {/* Estado */}
       {loading && <div style={{ color: '#666' }}>Cargando…</div>}
       {err && !loading && <div style={{ color: '#b00020' }}>Error: {err}</div>}
 
-      {/* Lista */}
       {(!loading && list.length === 0) ? (
         <div style={{ color: '#666' }}>No hay comentarios.</div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {list.map((c) => (
             <li key={c.id} style={{ border: '1px solid #eee', borderRadius: 8, padding: 8 }}>
-              <div style={{ marginBottom: 4 }}>{c.text}</div>
+              <div style={{ marginBottom: 4, whiteSpace: 'pre-wrap' }}>{c.text}</div>
               <div style={{ fontSize: 12, color: '#666', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}</span>
+                <span>
+                  {c.author?.name ? <b>{c.author.name}</b> : '—'} · {c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}
+                </span>
                 <button disabled={busy} onClick={() => onDelete(c.id)}>Borrar</button>
               </div>
             </li>
