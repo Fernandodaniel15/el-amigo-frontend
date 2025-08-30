@@ -1,5 +1,4 @@
-﻿// app/backend/gateway/src/index.ts
-import Fastify from 'fastify';
+﻿import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -9,7 +8,7 @@ const app = Fastify({ logger: true });
 
 await app.register(helmet);
 
-// permite frontends en 3000 y 3001
+// ✅ permite frontends en 3000 y 3001 + métodos PUT/DELETE
 await app.register(cors, {
   origin: [
     'http://localhost:3000',
@@ -17,7 +16,8 @@ await app.register(cors, {
     'http://localhost:3001',
     'http://127.0.0.1:3001',
   ],
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-Idempotency-Key'],
 });
 
 await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
@@ -29,7 +29,6 @@ app.get('/health', async () => ({ ok: true }));
 await app.register(feedRoutes, { prefix: '/v1' });
 
 const PORT = Number(process.env.PORT ?? 8080);
-
 app
   .listen({ port: PORT, host: '0.0.0.0' })
   .then(() => app.log.info(`Gateway listo http://localhost:${PORT}`))
