@@ -4,3 +4,7 @@ dist
 .env
 .DS_Store
 minio-data
+app/backend/gateway/data/
+app/backend/users/data/
+app/backend/posts/data/
+app/backend/comments/data/

@@ -1,45 +1,41 @@
+/**
+ * AMIGO :: BLOQUE: feed · SUBMÓDULO: login-page · ACCIÓN(ES): CREAR/MODIFICAR
+ * SUPERFICIE UI: feed
+ * DEPENDENCIAS: /auth/*
+ * DESCRIPCIÓN: login dev para setear cookie "me"
+ */
 // app/frontend/app/login/page.tsx
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { apiLogin, apiLogout, apiMe } from '@/lib/http';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [name, setName] = useState('');
-  const [me, setMe] = useState<{ id: string; name: string } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [me, setMe] = useState<{id:string; name:string} | null>(null);
+  const [id, setId] = useState('u1');
+  const [name, setName] = useState('Fer');
   const router = useRouter();
 
   async function refreshMe() {
     const r = await apiMe();
-    setMe(r.ok && r.user ? r.user : null);
+    setMe(r.ok ? (r.user || null) : null);
   }
 
+  useEffect(() => { refreshMe(); }, []);
+
   return (
-    <div>
+    <main style={{ padding: 20, fontFamily: 'system-ui' }}>
       <h1>Login</h1>
-      <button onClick={refreshMe} style={{ marginBottom: 12 }}>Ver estado</button>
-      {me && <div>Conectado: <b>{me.name}</b> ({me.id})</div>}
+      <p>{me ? `Logueado como ${me.name} (${me.id})` : 'No logueado'}</p>
 
-      <div style={{ marginTop: 16 }}>
-        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre..." />
-        <button disabled={busy} onClick={async ()=>{
-          setBusy(true);
-          try {
-            await apiLogin(name);
-            router.push('/feed');
-            router.refresh();
-          } finally { setBusy(false); }
-        }}>Entrar</button>
-
-        <button disabled={busy} onClick={async ()=>{
-          setBusy(true);
-          try {
-            await apiLogout();
-            router.refresh();
-          } finally { setBusy(false); }
-        }} style={{ marginLeft: 8 }}>Salir</button>
+      <div style={{ display: 'flex', gap: 8, marginBlock: 10 }}>
+        <input value={id} onChange={e=>setId(e.target.value)} placeholder="id" />
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="name" />
+        <button onClick={async ()=>{ await apiLogin(id, name); await refreshMe(); router.refresh(); }}>Login</button>
+        <button onClick={async ()=>{ await apiLogout();    await refreshMe(); router.refresh(); }}>Logout</button>
       </div>
-    </div>
+
+      <a href="/feed">Ir al feed</a>
+    </main>
   );
 }

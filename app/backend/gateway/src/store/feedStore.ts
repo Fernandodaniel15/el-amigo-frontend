@@ -1,15 +1,27 @@
+/**
+ * AMIGO :: BLOQUE: feed · SUBMÓDULO: gateway-store · ACCIÓN(ES): MODIFICAR
+ * SUPERFICIE UI: feed
+ * DEPENDENCIAS: FS local data/db.json
+ * CONTRATOS: REST feed+comments v1 · COMPAT: backward-compatible
+ * SLOs: p95<200ms (I/O local)
+ * IDEMP: llamada a nivel rutas
+ * PRIVACIDAD: datos locales dev (gitignored)
+ * OBSERVABILIDAD: n/a
+ * INVARIANTES: items[].id únicos; comments[].id únicos por item
+ * RIESGOS MITIGADOS: corrupción por I/O parcial (write atómico por archivo)
+ * DESCRIPCIÓN: almacén JSON con cache en memoria, soporta author opcional
+ */
 // app/backend/gateway/src/store/feedStore.ts
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { User } from '../plugins/auth.js';
 
-export type Author = User; // { id, name }
+export type Author  = { id: string; name: string };
 export type Comment = { id: string; text: string; createdAt: string; author?: Author };
-export type Item = { id: string; text: string; createdAt: string; author?: Author; comments: Comment[] };
+export type Item    = { id: string; text: string; createdAt: string; author?: Author; comments: Comment[] };
 type DB = { items: Item[] };
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
+const DB_FILE  = path.join(DATA_DIR, 'db.json');
 
 let cache: DB | null = null;
 let loading: Promise<void> | null = null;
