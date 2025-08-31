@@ -12,39 +12,45 @@
  */
 // app/backend/gateway/src/plugins/auth.ts
 import fp from 'fastify-plugin';
+import cookie from '@fastify/cookie';
+
+type User = { id: string; name: string };
 
 declare module 'fastify' {
   interface FastifyRequest {
-    user?: { id: string; name: string } | null;
+    user?: User;
   }
 }
 
 export default fp(async (app) => {
-  app.decorateRequest('user', null);
+  await app.register(cookie, { secret: 'dev-secret' });
 
+  // Cargar user desde cookie
   app.addHook('preHandler', async (req) => {
-    const raw = req.cookies?.me;
-    if (raw) {
-      try { req.user = JSON.parse(raw); } catch { req.user = null; }
-    } else {
-      req.user = null;
-    }
+    const raw = req.cookies['auth_user'];
+    if (!raw) return;
+    try {
+      const u = JSON.parse(raw) as User;
+      if (u && u.id && u.name) req.user = u;
+    } catch {}
   });
 
   app.post('/auth/login', async (req, reply) => {
-    const { id, name } = (req.body ?? {}) as { id?: string; name?: string };
-    const user = { id: id || 'u1', name: name || 'Fer' };
-    reply
-      .setCookie('me', JSON.stringify(user), {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-      })
-      .send({ ok: true, user });
+    const body = (req.body ?? {}) as Partial<User>;
+    const id = (body.id ?? 'u1').toString();
+    const name = (body.name ?? 'User').toString();
+    const user: User = { id, name };
+    reply.setCookie('auth_user', JSON.stringify(user), {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+    });
+    return { ok: true, user };
   });
 
   app.post('/auth/logout', async (_req, reply) => {
-    reply.clearCookie('me', { path: '/' }).send({ ok: true });
+    reply.clearCookie('auth_user', { path: '/' });
+    return { ok: true };
   });
 
   app.get('/auth/me', async (req) => {

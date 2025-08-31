@@ -15,13 +15,27 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-export type Author  = { id: string; name: string };
-export type Comment = { id: string; text: string; createdAt: string; author?: Author };
-export type Item    = { id: string; text: string; createdAt: string; author?: Author; comments: Comment[] };
+export type Author = { id: string; name: string };
+
+export type Comment = {
+  id: string;
+  text: string;
+  createdAt: string;
+  author?: Author; // retro-compatible
+};
+
+export type Item = {
+  id: string;
+  text: string;
+  createdAt: string;
+  author?: Author; // retro-compatible
+  comments: Comment[];
+};
+
 type DB = { items: Item[] };
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
-const DB_FILE  = path.join(DATA_DIR, 'db.json');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 let cache: DB | null = null;
 let loading: Promise<void> | null = null;

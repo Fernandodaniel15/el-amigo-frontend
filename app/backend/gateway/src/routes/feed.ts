@@ -23,8 +23,9 @@ export default async function feedRoutes(app: FastifyInstance) {
   });
 
   // CREAR
-  app.post<{ Body: { text?: string } }>('/feed', async (req, reply) => {
-    if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+  app.post<{ Body: { text?: string } }>('/feed', async (req: any, reply) => {
+    const user = req.user as { id: string; name: string } | undefined;
+    if (!user) return reply.code(401).send({ message: 'login requerido' });
 
     const text = (req.body?.text ?? '').trim();
     if (!text) return reply.code(400).send({ message: 'texto vacío' });
@@ -34,7 +35,7 @@ export default async function feedRoutes(app: FastifyInstance) {
       id: randomUUID(),
       text,
       createdAt: new Date().toISOString(),
-      author: { id: req.user.id, name: req.user.name },
+      author: { id: user.id, name: user.name },
       comments: [],
     };
     await addItem(item);
@@ -44,35 +45,38 @@ export default async function feedRoutes(app: FastifyInstance) {
   // ACTUALIZAR
   app.put<{ Params: { id: string }, Body: { text?: string } }>(
     '/feed/:id',
-    async (req, reply) => {
-      if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+    async (req: any, reply) => {
+      const user = req.user as { id: string; name: string } | undefined;
+      if (!user) return reply.code(401).send({ message: 'login requerido' });
 
       const text = (req.body?.text ?? '').trim();
       if (!text) return reply.code(400).send({ message: 'texto vacío' });
 
-      const current = await getById(req.params.id);
-      if (!current) return reply.code(404).send({ message: 'no existe' });
-      if (current.author?.id && current.author.id !== req.user.id) {
+      const it = await getById(req.params.id);
+      if (!it) return reply.code(404).send({ message: 'no existe' });
+
+      if (it.author?.id && it.author.id !== user.id) {
         return reply.code(403).send({ message: 'forbidden' });
       }
 
-      const it = await updateItem(req.params.id, { text });
-      return { ok: true, item: it };
+      const updated = await updateItem(req.params.id, { text });
+      return { ok: true, item: updated };
     }
   );
 
   // BORRAR
-  app.delete<{ Params: { id: string } }>('/feed/:id', async (req, reply) => {
-    if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+  app.delete<{ Params: { id: string } }>('/feed/:id', async (req: any, reply) => {
+    const user = req.user as { id: string; name: string } | undefined;
+    if (!user) return reply.code(401).send({ message: 'login requerido' });
 
-    const current = await getById(req.params.id);
-    if (!current) return reply.code(404).send({ message: 'no existe' });
-    if (current.author?.id && current.author.id !== req.user.id) {
+    const it = await getById(req.params.id);
+    if (!it) return reply.code(404).send({ message: 'no existe' });
+    if (it.author?.id && it.author.id !== user.id) {
       return reply.code(403).send({ message: 'forbidden' });
     }
 
-    const removed = await removeItem(req.params.id);
-    return { ok: true, item: removed };
+    await removeItem(req.params.id);
+    return { ok: true };
   });
 
   // ===== Comentarios =====
@@ -84,11 +88,12 @@ export default async function feedRoutes(app: FastifyInstance) {
     return { comments: [...it.comments].reverse() };
   });
 
-  // CREAR
+  // CREAR comentario
   app.post<{ Params: { id: string }, Body: { text?: string } }>(
     '/feed/:id/comments',
-    async (req, reply) => {
-      if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+    async (req: any, reply) => {
+      const user = req.user as { id: string; name: string } | undefined;
+      if (!user) return reply.code(401).send({ message: 'login requerido' });
 
       const it = await getById(req.params.id);
       if (!it) return reply.code(404).send({ message: 'item no existe' });
@@ -101,25 +106,27 @@ export default async function feedRoutes(app: FastifyInstance) {
         id: randomUUID(),
         text,
         createdAt: new Date().toISOString(),
-        author: { id: req.user.id, name: req.user.name },
+        author: { id: user.id, name: user.name },
       };
       await addComment(it.id, c);
       return { ok: true, comment: c };
     }
   );
 
-  // BORRAR
+  // BORRAR comentario
   app.delete<{ Params: { id: string, cid: string } }>(
     '/feed/:id/comments/:cid',
-    async (req, reply) => {
-      if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+    async (req: any, reply) => {
+      const user = req.user as { id: string; name: string } | undefined;
+      if (!user) return reply.code(401).send({ message: 'login requerido' });
 
       const it = await getById(req.params.id);
       if (!it) return reply.code(404).send({ message: 'item no existe' });
 
       const comment = it.comments.find(c => c.id === req.params.cid);
       if (!comment) return reply.code(404).send({ message: 'comentario no existe' });
-      if (comment.author?.id && comment.author.id !== req.user.id) {
+
+      if (comment.author?.id && comment.author.id !== user.id) {
         return reply.code(403).send({ message: 'forbidden' });
       }
 
@@ -127,10 +134,4 @@ export default async function feedRoutes(app: FastifyInstance) {
       return { ok: true };
     }
   );
-
-  // util opcional: limpiar todo (no exponer en prod)
-  app.delete('/feed', async () => {
-    // si hiciera falta limpiar, podríamos setear [] en el json; omitido para seguridad.
-    return { ok: true };
-  });
 }
