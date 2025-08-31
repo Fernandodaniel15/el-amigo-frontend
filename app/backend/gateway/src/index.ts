@@ -1,22 +1,16 @@
-﻿/**
- * AMIGO :: BLOQUE: auth · SUBMÓDULO: gateway-bootstrap · ACCIÓN(ES): MODIFICAR
- * SUPERFICIE UI: feed/login
- * DEPENDENCIAS: @fastify/cookie, ./plugins/auth
- * COMPAT: backward-compatible
- * DESCRIPCIÓN: registra cookie+auth; CORS con credenciales
- */
-// app/backend/gateway/src/index.ts
-import cookie from '@fastify/cookie';
+﻿// app/backend/gateway/src/index.ts
+import Fastify from 'fastify';
 import cors from '@fastify/cors';
-// ...
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import authPlugin from './plugins/auth.js';
-// ...
-await app.register(authPlugin);
-// ...
+import feedRoutes from './routes/feed.js';
 
-// ...
-await app.register(cookie, { secret: 'dev-secret' });
+const app = Fastify({ logger: true });
 
+await app.register(helmet);
+
+// CORS para 3000 y 3001 + credenciales (cookies)
 await app.register(cors, {
   origin: [
     'http://localhost:3000',
@@ -24,6 +18,26 @@ await app.register(cors, {
     'http://localhost:3001',
     'http://127.0.0.1:3001',
   ],
-  credentials: true, // << necesario para cookies
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
 });
+
+await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+
+// Health simple
+app.get('/health', async () => ({ ok: true }));
+
+// ⚠️ Registrar primero AUTH (sin prefijo), luego API con prefijo /v1
+await app.register(authPlugin);               // /auth/login | /auth/logout | /auth/me
+await app.register(feedRoutes, { prefix: '/v1' });
+
+const PORT = Number(process.env.PORT ?? 8080);
+app
+  .listen({ port: PORT, host: '0.0.0.0' })
+  .then(() => app.log.info(`Gateway listo http://localhost:${PORT}`))
+  .catch((err) => {
+    app.log.error(err);
+    process.exit(1);
+  });
+
+export default app;

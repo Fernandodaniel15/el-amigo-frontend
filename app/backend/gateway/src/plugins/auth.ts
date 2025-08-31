@@ -1,7 +1,7 @@
 /** 
  * AMIGO :: BLOQUE: auth · SUBMÓDULO: gateway-auth-plugin · ACCIÓN(ES): CREAR
  * SUPERFICIE UI: feed/login
- * DEPENDENCIAS: @fastify/cookie
+ * DEPENDENCIAS: @fastify/cookie@6, fastify-plugin@4
  * CONTRATOS: /auth/login|logout|me
  * COMPAT: backward-compatible
  * SLOs: p95<50ms
@@ -11,7 +11,7 @@
  * DESCRIPCIÓN: auth dev muy simple para atar author a ítems/comentarios
  */
 // app/backend/gateway/src/plugins/auth.ts
-import fp from 'fastify-plugin';
+import fp from 'fastify-plugin';   // con fastify-plugin@4 va bien
 import cookie from '@fastify/cookie';
 
 type User = { id: string; name: string };
@@ -25,13 +25,12 @@ declare module 'fastify' {
 export default fp(async (app) => {
   await app.register(cookie, { secret: 'dev-secret' });
 
-  // Cargar user desde cookie
   app.addHook('preHandler', async (req) => {
     const raw = req.cookies['auth_user'];
     if (!raw) return;
     try {
       const u = JSON.parse(raw) as User;
-      if (u && u.id && u.name) req.user = u;
+      if (u?.id && u?.name) req.user = u;
     } catch {}
   });
 
@@ -41,9 +40,7 @@ export default fp(async (app) => {
     const name = (body.name ?? 'User').toString();
     const user: User = { id, name };
     reply.setCookie('auth_user', JSON.stringify(user), {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
+      path: '/', httpOnly: true, sameSite: 'lax',
     });
     return { ok: true, user };
   });
