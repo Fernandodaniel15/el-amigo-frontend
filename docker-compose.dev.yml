@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  gateway:
+    image: node:20-alpine
+    working_dir: /work/app/backend/gateway
+    command: sh -lc "corepack enable && pnpm i && pnpm dev"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/work
+    environment:
+      NODE_ENV: development
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /work/app/frontend
+    command: sh -lc "corepack enable && pnpm i && pnpm dev -p 3001"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./:/work
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+    depends_on:
+      - gateway

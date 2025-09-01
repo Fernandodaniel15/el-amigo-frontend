@@ -1,30 +1,20 @@
-/** 
- * AMIGO :: BLOQUE: auth · SUBMÓDULO: gateway-auth-plugin · ACCIÓN(ES): CREAR
- * SUPERFICIE UI: feed/login
- * DEPENDENCIAS: @fastify/cookie@6, fastify-plugin@4
- * CONTRATOS: /auth/login|logout|me
- * COMPAT: backward-compatible
- * SLOs: p95<50ms
- * PRIVACIDAD: cookie httpOnly
- * OBSERVABILIDAD: logs fastify
- * RIESGOS MITIGADOS: spoof básico (solo dev)
- * DESCRIPCIÓN: auth dev muy simple para atar author a ítems/comentarios
+/**
+ * AMIGO :: gateway-auth-plugin (DEV)
+ * Cookie httpOnly con user simple. En prod: usar secreto por env y secure:true con HTTPS.
  */
-// app/backend/gateway/src/plugins/auth.ts
-import fp from 'fastify-plugin';   // con fastify-plugin@4 va bien
+import fp from 'fastify-plugin/plugin.js';
 import cookie from '@fastify/cookie';
 
-type User = { id: string; name: string };
+export type User = { id: string; name: string };
 
 declare module 'fastify' {
-  interface FastifyRequest {
-    user?: User;
-  }
+  interface FastifyRequest { user?: User; }
 }
 
 export default fp(async (app) => {
   await app.register(cookie, { secret: 'dev-secret' });
 
+  // hidrata req.user desde cookie
   app.addHook('preHandler', async (req) => {
     const raw = req.cookies['auth_user'];
     if (!raw) return;
@@ -40,7 +30,10 @@ export default fp(async (app) => {
     const name = (body.name ?? 'User').toString();
     const user: User = { id, name };
     reply.setCookie('auth_user', JSON.stringify(user), {
-      path: '/', httpOnly: true, sameSite: 'lax',
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false, // dev en http://localhost
     });
     return { ok: true, user };
   });
@@ -50,7 +43,5 @@ export default fp(async (app) => {
     return { ok: true };
   });
 
-  app.get('/auth/me', async (req) => {
-    return { ok: true, user: req.user ?? null };
-  });
+  app.get('/auth/me', async (req) => ({ ok: true, user: req.user ?? null }));
 });
