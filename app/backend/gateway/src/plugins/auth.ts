@@ -1,6 +1,5 @@
 /**
- * AMIGO :: gateway-auth-plugin (DEV)
- * Cookie httpOnly con user simple. En prod: usar secreto por env y secure:true con HTTPS.
+ * AMIGO :: gateway-auth-plugin
  */
 import fp from 'fastify-plugin/plugin.js';
 import cookie from '@fastify/cookie';
@@ -8,32 +7,32 @@ import cookie from '@fastify/cookie';
 export type User = { id: string; name: string };
 
 declare module 'fastify' {
-  interface FastifyRequest { user?: User; }
+  interface FastifyRequest { user?: User }
 }
 
 export default fp(async (app) => {
   await app.register(cookie, { secret: 'dev-secret' });
 
-  // hidrata req.user desde cookie
+  // Cargar usuario desde cookie
   app.addHook('preHandler', async (req) => {
     const raw = req.cookies['auth_user'];
     if (!raw) return;
     try {
       const u = JSON.parse(raw) as User;
-      if (u?.id && u?.name) req.user = u;
+      if (u && u.id && u.name) req.user = u;
     } catch {}
   });
 
   app.post('/auth/login', async (req, reply) => {
     const body = (req.body ?? {}) as Partial<User>;
-    const id = (body.id ?? 'u1').toString();
+    const id   = (body.id ?? 'u1').toString();
     const name = (body.name ?? 'User').toString();
     const user: User = { id, name };
     reply.setCookie('auth_user', JSON.stringify(user), {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
-      secure: false, // dev en http://localhost
+      secure: false // dev en http://localhost
     });
     return { ok: true, user };
   });
@@ -43,5 +42,7 @@ export default fp(async (app) => {
     return { ok: true };
   });
 
-  app.get('/auth/me', async (req) => ({ ok: true, user: req.user ?? null }));
+  app.get('/auth/me', async (req) => {
+    return { ok: true, user: req.user ?? null };
+  });
 });

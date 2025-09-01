@@ -1,16 +1,3 @@
-/** * AMIGO :: BLOQUE: frontend · SUBMÓDULO: feed-item · ACCIÓN(ES): MODIFICAR
-
-SUPERFICIE UI: feed
-
-DEPENDENCIAS: http.ts
-
-CONTRATOS: /v1/feed/*, /auth/me
-
-COMPAT: backward-compatible
-
-DESCRIPCIÓN: edición optimista + like item
-*/
-//app/frontend/app/feed/FeedItem.tsx
 'use client';
 
 import { useEffect, useState, startTransition } from 'react';
@@ -37,7 +24,7 @@ export default function FeedItem({ id, text, createdAt, author, reactionsCount =
   const [likes, setLikes] = useState(reactionsCount);
   const [liked, setLiked] = useState(likedByMe);
 
-  useEffect(() => { apiMe().then(r => setMe(r.user)); }, []);
+  useEffect(() => { apiMe().then(r => setMe((r as any).user ?? null)); }, []);
   const canEdit = !!(me && author && me.id === author.id);
 
   async function onSave() {
@@ -51,6 +38,7 @@ export default function FeedItem({ id, text, createdAt, author, reactionsCount =
     } catch (e:any) { alert(e?.message || 'No se pudo guardar'); }
     finally { setBusy(false); }
   }
+
   async function onDelete() {
     if (!confirm('¿Borrar este ítem?')) return;
     setBusy(true);
@@ -58,18 +46,21 @@ export default function FeedItem({ id, text, createdAt, author, reactionsCount =
     catch (e:any) { alert(e?.message || 'No se pudo borrar'); }
     finally { setBusy(false); }
   }
+
   async function onLike() {
     if (!me) return alert('Login para reaccionar');
     // optimista
+    const prevLiked = liked;
+    const prevLikes = likes;
     setLiked(v => !v);
-    setLikes(n => (liked ? n-1 : n+1));
+    setLikes(n => (prevLiked ? n - 1 : n + 1));
     try {
       await apiPost(`/v1/feed/${id}/like`, {});
       startTransition(() => router.refresh());
     } catch {
       // rollback
-      setLiked(v => !v);
-      setLikes(n => (liked ? n+1 : n-1));
+      setLiked(prevLiked);
+      setLikes(prevLikes);
     }
   }
 
@@ -104,4 +95,3 @@ export default function FeedItem({ id, text, createdAt, author, reactionsCount =
     </div>
   );
 }
-// FeedItem.tsx

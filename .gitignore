@@ -1,13 +1,11 @@
-node_modules/
+node_modules
+dist
+.next
 .env
-*.log
-dist/
-build/
-.next/
-.expo/
-*.lock
-.idea/
 .DS_Store
+minio-data
 
-/generated/prisma
 app/backend/gateway/data/
+app/backend/users/data/
+app/backend/posts/data/
+app/backend/comments/data/

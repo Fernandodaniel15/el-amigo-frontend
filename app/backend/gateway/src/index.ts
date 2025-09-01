@@ -1,18 +1,6 @@
-﻿/** * AMIGO :: BLOQUE: gateway · SUBMÓDULO: bootstrap · ACCIÓN(ES): MODIFICAR
-
-SUPERFICIE UI: feed/login
-
-DEPENDENCIAS: fastify, cors, helmet, cookie, rate-limit, rutas
-
-CONTRATOS: /auth/* (sin /v1), /v1/*
-
-COMPAT: backward-compatible
-
-SLOs: p95<100ms
-
-DESCRIPCIÓN: arranque servidor + rate-limit + prefijos
-*/
-// app/backend/gateway/src/index.ts
+﻿/**
+ * AMIGO :: gateway bootstrap
+ */
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -29,12 +17,12 @@ await app.register(cors, {
     'http://127.0.0.1:3001',
   ],
   credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 });
 
 await app.register(helmet);
-await app.register(authPlugin);                  // /auth/*
-await app.register(feedRoutes, { prefix: '/v1' });// /v1/*
+await app.register(authPlugin);                       // /auth/*
+await app.register(feedRoutes, { prefix: '/v1' });    // /v1/feed...
 
 app.get('/v1/health', async () => ({ ok: true }));
 
