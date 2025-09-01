@@ -21,8 +21,8 @@ services:
     volumes:
       - ./:/work
     environment:
-      # URL que ve el navegador (fuera de Docker)
+      # URL que ve el navegador (afuera del contenedor)
       - NEXT_PUBLIC_API_URL=http://localhost:8080
-      # URL interna que usa Next SSR dentro de Docker
+      # URL interna que usa Next.js en SSR (dentro de docker)
       - BACKEND_INTERNAL_URL=http://gateway:8080
       - NODE_ENV=development

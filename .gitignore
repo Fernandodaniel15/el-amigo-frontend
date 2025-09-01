@@ -5,7 +5,5 @@ dist
 .DS_Store
 minio-data
 
+# bases locales
 app/backend/gateway/data/
-app/backend/users/data/
-app/backend/posts/data/
-app/backend/comments/data/

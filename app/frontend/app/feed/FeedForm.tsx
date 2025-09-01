@@ -22,7 +22,9 @@ export default function FeedForm() {
       router.refresh();
     } catch (e:any) {
       alert(e?.message || 'Error');
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -35,8 +37,10 @@ export default function FeedForm() {
         disabled={!me}
         style={{ width: '100%', padding: 8 }}
       />
-      <button disabled={busy || !me} type="submit">Enviar</button>
-      {!me && <a href="/login" style={{ marginLeft: 8 }}>Ir a login</a>}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button disabled={busy || !me} type="submit">Enviar</button>
+        {!me && <a href="/login">Ir a login</a>}
+      </div>
     </form>
   );
 }

@@ -24,7 +24,7 @@ export default function FeedItem({ id, text, createdAt, author, reactionsCount =
   const [likes, setLikes] = useState(reactionsCount);
   const [liked, setLiked] = useState(likedByMe);
 
-  useEffect(() => { apiMe().then(r => setMe((r as any).user ?? null)); }, []);
+  useEffect(() => { apiMe().then(r => setMe(r.user ?? null)); }, []);
   const canEdit = !!(me && author && me.id === author.id);
 
   async function onSave() {
@@ -50,17 +50,15 @@ export default function FeedItem({ id, text, createdAt, author, reactionsCount =
   async function onLike() {
     if (!me) return alert('Login para reaccionar');
     // optimista
-    const prevLiked = liked;
-    const prevLikes = likes;
     setLiked(v => !v);
-    setLikes(n => (prevLiked ? n - 1 : n + 1));
+    setLikes(n => (liked ? n - 1 : n + 1));
     try {
       await apiPost(`/v1/feed/${id}/like`, {});
       startTransition(() => router.refresh());
     } catch {
-      // rollback
-      setLiked(prevLiked);
-      setLikes(prevLikes);
+      // rollback si falló
+      setLiked(v => !v);
+      setLikes(n => (liked ? n + 1 : n - 1));
     }
   }
 
