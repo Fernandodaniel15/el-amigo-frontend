@@ -1,6 +1,5 @@
 /**
- * AMIGO :: BLOQUE: auth · SUBMÓDULO: gateway-auth-plugin · ACCIÓN: MODIFICAR
- * DESCRIPCIÓN: auth dev simple para atar author a ítems/comentarios
+ * AMIGO :: auth cookie (dev)
  */
 import fp from 'fastify-plugin/plugin.js';
 import cookie from '@fastify/cookie';
@@ -8,13 +7,13 @@ import cookie from '@fastify/cookie';
 export type User = { id: string; name: string };
 
 declare module 'fastify' {
-  interface FastifyRequest { user?: User; }
+  interface FastifyRequest { user?: User }
 }
 
 export default fp(async (app) => {
   await app.register(cookie, { secret: 'dev-secret' });
 
-  // carga user desde cookie
+  // hidratar req.user desde cookie
   app.addHook('preHandler', async (req) => {
     const raw = req.cookies['auth_user'];
     if (!raw) return;
@@ -29,17 +28,20 @@ export default fp(async (app) => {
     const id = (body.id ?? 'u1').toString();
     const name = (body.name ?? 'User').toString();
     const user: User = { id, name };
+
     reply.setCookie('auth_user', JSON.stringify(user), {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
-      secure: false // dev en http://
+      secure: false,         // dev http
+      domain: 'localhost',   // MUY IMPORTANTE: misma "site" que el frontend
     });
+
     return { ok: true, user };
   });
 
   app.post('/auth/logout', async (_req, reply) => {
-    reply.clearCookie('auth_user', { path: '/' });
+    reply.clearCookie('auth_user', { path: '/', domain: 'localhost' });
     return { ok: true };
   });
 

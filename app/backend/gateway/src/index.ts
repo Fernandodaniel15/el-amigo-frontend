@@ -1,6 +1,5 @@
 ﻿/**
- * AMIGO :: BLOQUE: gateway · SUBMÓDULO: server-bootstrap · ACCIÓN: MODIFICAR
- * DESCRIPCIÓN: Arranque del servidor, CORS con credenciales, helmet y prefijo /v1
+ * AMIGO :: gateway bootstrap (CORS + /v1 + auth)
  */
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
@@ -18,15 +17,15 @@ await app.register(cors, {
     'http://127.0.0.1:3001',
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
 });
 
 await app.register(helmet);
-await app.register(authPlugin);                  // /auth/*
-await app.register(feedRoutes, { prefix: '/v1' });// /v1/feed*
+await app.register(authPlugin);                      // /auth/*
+await app.register(feedRoutes, { prefix: '/v1' });  // /v1/feed*
 
 app.get('/v1/health', async () => ({ ok: true }));
 
 const port = Number(process.env.PORT || 8080);
-await app.listen({ port, host: '0.0.0.0' });
-console.log(`🚀 Gateway en http://localhost:${port}/v1`);
+await app.listen({ port, host: 'localhost' });      // host "localhost" (no ::1)
+app.log.info(`🚀 Gateway en http://localhost:${port}/v1`);
