@@ -1,4 +1,5 @@
-﻿/**
+﻿// lib/http.ts
+/**
  * AMIGO :: http wrapper (BASE robusta + timeout + cookies + logs útiles)
  */
 

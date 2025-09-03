@@ -1,4 +1,5 @@
-﻿'use client';
+﻿// app/frontend/app/feed/FeedForm.tsx
+'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { apiMe, apiPost } from '@/lib/http';
