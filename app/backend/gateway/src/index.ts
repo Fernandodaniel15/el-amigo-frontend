@@ -1,5 +1,4 @@
-﻿// app/backend/gateway/src/index.ts
-import Fastify from 'fastify';
+﻿import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import feedRoutes from './routes/feed.js';
@@ -20,11 +19,11 @@ await app.register(cors, {
 });
 await app.register(helmet);
 
-await app.register(authPlugin);                       // /auth/*
-await app.register(feedRoutes, { prefix: '/v1' });    // /v1/*
+await app.register(authPlugin);                    // /auth/*
+await app.register(feedRoutes, { prefix: '/v1' }); // /v1/*
 
 app.get('/v1/health', async () => ({ ok: true }));
 
 const port = Number(process.env.PORT || 8080);
-await app.listen({ port, host: 'localhost' });        // importante: 'localhost'
+await app.listen({ port, host: 'localhost' });
 app.log.info(`🚀 Gateway en http://localhost:${port}/v1`);

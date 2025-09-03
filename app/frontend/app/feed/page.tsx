@@ -39,3 +39,4 @@ export default async function FeedPage() {
     </main>
   );
 }
+// app/frontend/pages/feed.tsx
