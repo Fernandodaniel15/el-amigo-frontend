@@ -1,4 +1,5 @@
-﻿import Fastify from 'fastify';
+﻿// app/backend/gateway/src/index.ts
+import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import feedRoutes from './routes/feed.js';
