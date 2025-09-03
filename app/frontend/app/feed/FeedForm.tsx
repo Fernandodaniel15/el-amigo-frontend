@@ -1,18 +1,17 @@
 ﻿'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { apiMe, apiPost } from '@/lib/http';
 
-type Me = { id: string; name: string };
-
+type Me  = { id: string; name: string };
 type Img = { url: string; filter?: string; caption?: string };
-type Vid = { url: string; filter?: string; overlay?: { text: string; pos: 'tl'|'tr'|'bl'|'br'; size: number; family: string } };
+type Vid = { url: string; filter?: string };
 type Aud = { url: string; transcription?: string; effect?: 'none'|'fast'|'slow'|'robot' };
 
 const IMG_FILTERS = ['none','grayscale','sepia','contrast','saturate','blur'] as const;
 const VID_FILTERS = ['none','grayscale','sepia','contrast'] as const;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
 function absUrl(u: string) {
   if (!u) return u;
@@ -31,7 +30,7 @@ function cssFilter(filter?: string) {
 }
 
 export default function FeedForm() {
-  const [me, setMe] = useState<Me | null>(null);
+  const [me, setMe]     = useState<Me | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -39,35 +38,46 @@ export default function FeedForm() {
   const [vids, setVids] = useState<Vid[]>([]);
   const [auds, setAuds] = useState<Aud[]>([]);
 
-  // Cámara (foto)
-  const photoVideoRef = useRef<HTMLVideoElement | null>(null);
+  // FOTO (cámara)
+  const photoVideoRef  = useRef<HTMLVideoElement | null>(null);
   const photoStreamRef = useRef<MediaStream | null>(null);
   const [photoCamOn, setPhotoCamOn] = useState(false);
 
-  // Video (grabación)
-  const recVideoRef = useRef<HTMLVideoElement | null>(null);
-  const recStreamRef = useRef<MediaStream | null>(null);
-  const recMediaRecRef = useRef<MediaRecorder | null>(null);
-  const recChunksRef = useRef<BlobPart[]>([]);
-  const [recOn, setRecOn] = useState(false);
+  // VIDEO (grabación)
+  const recVideoRef      = useRef<HTMLVideoElement | null>(null);
+  const recStreamRef     = useRef<MediaStream | null>(null);
+  const recMediaRecRef   = useRef<MediaRecorder | null>(null);
+  const recChunksRef     = useRef<BlobPart[]>([]);
+  const [recOn, setRecOn]= useState(false);
 
-  // Audio / voz
-  const vrecRef = useRef<MediaRecorder | null>(null);
-  const vrecChunksRef = useRef<BlobPart[]>([]);
+  // AUDIO / VOZ
+  const vrecRef        = useRef<MediaRecorder | null>(null);
+  const vrecChunksRef  = useRef<BlobPart[]>([]);
   const [voiceOn, setVoiceOn] = useState(false);
   const [voiceEffect, setVoiceEffect] = useState<'none'|'fast'|'slow'|'robot'>('none');
-  const [voiceTrans, setVoiceTrans] = useState('');
+  const [voiceTrans,  setVoiceTrans]  = useState('');
 
-  useEffect(() => { apiMe().then(r => setMe(r.user ?? null)); }, []);
+  useEffect(() => {
+    apiMe().then(r => setMe(r.user ?? null));
+    return () => {
+      photoStreamRef.current?.getTracks().forEach(t => t.stop());
+      recStreamRef.current?.getTracks().forEach(t => t.stop());
+      if (recMediaRecRef.current && recMediaRecRef.current.state !== 'inactive') recMediaRecRef.current.stop();
+      if (vrecRef.current && vrecRef.current.state !== 'inactive') vrecRef.current.stop();
+    };
+  }, []);
 
-  // ===== util subida =====
-  async function fileToDataURL(file: File) {
-    const buf = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-    return `data:${file.type};base64,${base64}`;
-  }
+  // ===== helpers de subida =====
+  const fileToDataURL = useCallback((file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result));
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(file);
+    });
+  }, []);
+
   async function uploadDataURL(dataUrl: string, ext?: string) {
-    // Importante: string (no regex) y credentials via apiPost
     const up = await apiPost<{ ok: true; url: string }>('/v1/files', { dataUrl, ext });
     return absUrl(up.url);
   }
@@ -78,22 +88,23 @@ export default function FeedForm() {
   }
 
   // ===== cámara (foto) =====
-  async function startPhotoCam() {
+  const startPhotoCam = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       photoStreamRef.current = stream;
-      setPhotoCamOn(true); // 1) primero renderiza el <video>
+      setPhotoCamOn(true); // importante: enlazar luego en useEffect
     } catch {
       alert('No se pudo abrir la cámara');
     }
-  }
-  function stopPhotoCam() {
+  }, []);
+
+  const stopPhotoCam = useCallback(() => {
     photoStreamRef.current?.getTracks().forEach(t => t.stop());
     photoStreamRef.current = null;
     setPhotoCamOn(false);
-  }
+  }, []);
 
-  // 2) cuando el <video> existe y hay stream, enlazo srcObject (fix clave)
+  // enlazar stream -> video cuando existe el nodo
   useEffect(() => {
     const v = photoVideoRef.current;
     const s = photoStreamRef.current;
@@ -101,12 +112,13 @@ export default function FeedForm() {
       try {
         // @ts-ignore
         v.srcObject = s;
+        v.muted = true;
         v.play().catch(() => {});
       } catch {}
     }
   }, [photoCamOn]);
 
-  async function takeSnapshot() {
+  const takeSnapshot = useCallback(async () => {
     const v = photoVideoRef.current;
     if (!v) return;
     const w = v.videoWidth || 640;
@@ -122,9 +134,9 @@ export default function FeedForm() {
     } catch (e:any) {
       alert(e?.message || 'No se pudo subir la foto');
     }
-  }
+  }, []);
 
-  // ===== imágenes por archivo =====
+  // ===== inputs por archivo =====
   async function onPickImages(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     const uploaded: Img[] = [];
@@ -135,8 +147,6 @@ export default function FeedForm() {
     setImgs(prev => [...prev, ...uploaded]);
     e.currentTarget.value = '';
   }
-
-  // ===== videos por archivo =====
   async function onPickVideos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     const uploaded: Vid[] = [];
@@ -149,33 +159,44 @@ export default function FeedForm() {
   }
 
   // ===== grabar video =====
-  async function startRecVideo() {
+  const startRecVideo = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      recStreamRef.current = stream;
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      recStreamRef.current = s;
       recChunksRef.current = [];
-      const mr = new MediaRecorder(stream);
+
+      const mime =
+        (window as any).MediaRecorder?.isTypeSupported?.('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' :
+        (window as any).MediaRecorder?.isTypeSupported?.('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' :
+        (window as any).MediaRecorder?.isTypeSupported?.('video/mp4') ? 'video/mp4' : '';
+
+      const mr = new MediaRecorder(s, mime ? { mimeType: mime } : undefined);
       recMediaRecRef.current = mr;
+
       mr.ondataavailable = (e) => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
       mr.onstop = async () => {
-        const blob = new Blob(recChunksRef.current, { type: 'video/webm' });
+        const blobType = mime.includes('mp4') ? 'video/mp4' : 'video/webm';
+        const blob = new Blob(recChunksRef.current, { type: blobType });
         recChunksRef.current = [];
         const fr = new FileReader();
         fr.onload = async () => {
           try {
-            const url = await uploadDataURL(String(fr.result), 'webm');
+            const url = await uploadDataURL(String(fr.result), blobType.endsWith('mp4') ? 'mp4' : 'webm');
             setVids(prev => [...prev, { url: absUrl(url), filter: 'none' }]);
           } catch (e:any) { alert(e?.message || 'No se pudo subir el video'); }
         };
         fr.readAsDataURL(blob);
-        stream.getTracks().forEach(t => t.stop());
+        s.getTracks().forEach(t => t.stop());
       };
+
       setRecOn(true); // renderiza el <video> de preview
+      mr.start();     // imprescindible
     } catch {
       alert('No se pudo iniciar la cámara para video');
     }
-  }
-  // cuando el <video> existe, enlazo stream (mismo fix que foto)
+  }, []);
+
+  // enlazar stream -> video preview
   useEffect(() => {
     const v = recVideoRef.current;
     const s = recStreamRef.current;
@@ -183,31 +204,41 @@ export default function FeedForm() {
       try {
         // @ts-ignore
         v.srcObject = s;
+        v.muted = true;
         v.play().catch(() => {});
       } catch {}
     }
   }, [recOn]);
 
-  function stopRecVideo() {
+  const stopRecVideo = useCallback(() => {
     const mr = recMediaRecRef.current;
     if (mr && mr.state !== 'inactive') mr.stop();
     setRecOn(false);
-  }
+  }, []);
 
   // ===== audio / voz =====
-  async function startVoice() {
+  const startVoice = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
       vrecChunksRef.current = [];
-      const mr = new MediaRecorder(stream);
+
+      const aMime =
+        (window as any).MediaRecorder?.isTypeSupported?.('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+        (window as any).MediaRecorder?.isTypeSupported?.('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' :
+        (window as any).MediaRecorder?.isTypeSupported?.('audio/mp4') ? 'audio/mp4' : '';
+
+      const mr = new MediaRecorder(s, aMime ? { mimeType: aMime } : undefined);
       vrecRef.current = mr;
+
       mr.ondataavailable = (e) => { if (e.data.size > 0) vrecChunksRef.current.push(e.data); };
       mr.onstop = async () => {
-        const blob = new Blob(vrecChunksRef.current, { type: 'audio/webm' });
+        const blobType = aMime.includes('mp4') ? 'audio/mp4' : (aMime.includes('ogg') ? 'audio/ogg' : 'audio/webm');
+        const blob = new Blob(vrecChunksRef.current, { type: blobType });
         const fr = new FileReader();
         fr.onload = async () => {
           try {
-            const url = await uploadDataURL(String(fr.result), 'webm');
+            const ext = blobType.endsWith('mp4') ? 'm4a' : (blobType.endsWith('ogg') ? 'ogg' : 'webm');
+            const url = await uploadDataURL(String(fr.result), ext);
             setAuds(prev => [...prev, { url: absUrl(url), effect: voiceEffect, transcription: voiceTrans }]);
             setVoiceTrans(''); setVoiceEffect('none');
           } catch (e:any) {
@@ -215,22 +246,23 @@ export default function FeedForm() {
           }
         };
         fr.readAsDataURL(blob);
-        stream.getTracks().forEach(t => t.stop());
+        s.getTracks().forEach(t => t.stop());
       };
       mr.start();
       setVoiceOn(true);
     } catch {
       alert('No se pudo acceder al micrófono');
     }
-  }
-  function stopVoice() {
+  }, [voiceEffect, voiceTrans]);
+
+  const stopVoice = useCallback(() => {
     const mr = vrecRef.current;
     if (mr && mr.state !== 'inactive') mr.stop();
     setVoiceOn(false);
-  }
+  }, []);
 
-  // ===== enviar post =====
-  async function onSubmit() {
+  // ===== publicar =====
+  const onSubmit = useCallback(async () => {
     const val = text.trim();
     const hasMedia = imgs.length > 0 || vids.length > 0 || auds.length > 0;
     if (!val && !hasMedia) return alert('Escribí algo o adjuntá media');
@@ -247,12 +279,12 @@ export default function FeedForm() {
       setText('');
       setImgs([]); setVids([]); setAuds([]);
       // @ts-ignore
-      if (typeof window !== 'undefined' && window?.amigoRefreshFeed) window.amigoRefreshFeed();
+      if (typeof window !== 'undefined' && (window as any)?.amigoRefreshFeed) (window as any).amigoRefreshFeed();
       else window.location.reload();
     } catch (e:any) {
       alert(e?.message || 'No se pudo publicar');
     } finally { setBusy(false); }
-  }
+  }, [text, imgs, vids, auds]);
 
   if (!me) return <div>Logueate para postear. <a href="/login">Login</a></div>;
 
@@ -266,7 +298,7 @@ export default function FeedForm() {
         style={{ width: '100%', padding: 8 }}
       />
 
-      {/* Adjuntos por archivo */}
+      {/* Adjuntos archivo */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
         <label style={{ cursor: 'pointer' }}>
           📷 Fotos (archivo)
@@ -278,7 +310,7 @@ export default function FeedForm() {
         </label>
       </div>
 
-      {/* Cámara: tomar foto */}
+      {/* Cámara: foto */}
       <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {!photoCamOn ? (
           <button onClick={startPhotoCam}>📸 Tomar foto con cámara</button>
@@ -291,7 +323,7 @@ export default function FeedForm() {
         )}
       </div>
 
-      {/* Cámara: grabar video */}
+      {/* Cámara: video */}
       <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {!recOn ? (
           <button onClick={startRecVideo}>🎥 Grabar video</button>
@@ -303,7 +335,7 @@ export default function FeedForm() {
         )}
       </div>
 
-      {/* Voz / audio */}
+      {/* Voz */}
       <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={voiceEffect} onChange={e=>setVoiceEffect(e.target.value as any)}>
           <option value="none">Efecto: ninguno</option>

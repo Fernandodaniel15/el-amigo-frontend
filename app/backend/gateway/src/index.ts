@@ -1,7 +1,4 @@
-﻿/**
- * AMIGO :: gateway bootstrap (CORS + /v1 + auth)
- */
-import Fastify from 'fastify';
+﻿import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import feedRoutes from './routes/feed.js';
@@ -18,14 +15,15 @@ await app.register(cors, {
   ],
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['content-type','authorization'],
 });
-
 await app.register(helmet);
-await app.register(authPlugin);                      // /auth/*
-await app.register(feedRoutes, { prefix: '/v1' });  // /v1/feed*
+
+await app.register(authPlugin);                       // /auth/*
+await app.register(feedRoutes, { prefix: '/v1' });    // /v1/*
 
 app.get('/v1/health', async () => ({ ok: true }));
 
 const port = Number(process.env.PORT || 8080);
-await app.listen({ port, host: 'localhost' });      // host "localhost" (no ::1)
+await app.listen({ port, host: 'localhost' });        // importante: 'localhost'
 app.log.info(`🚀 Gateway en http://localhost:${port}/v1`);
