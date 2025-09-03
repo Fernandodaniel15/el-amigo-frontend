@@ -14,11 +14,13 @@ import { createReadStream } from 'node:fs';
 import path from 'node:path';
 
 const REACTIONS: ReactionType[] = ['❤','👎','👍','😂','🎉','😢','😡'];
+
+/** Carpeta de subidas (conservamos tu estructura data/uploads) */
 const UPLOAD_DIR = path.resolve(process.cwd(), 'data', 'uploads');
-
-const ALLOWED_EXT = new Set(['png','jpg','jpeg','webp','gif','mp4','webm','mp3','wav','ogg','m4a','mov']);
-
 async function ensureUploads() { try { await fs.mkdir(UPLOAD_DIR, { recursive: true }); } catch {} }
+
+/** Whitelist de extensiones (incluye mov/m4a para iOS/Safari) */
+const ALLOWED_EXT = new Set(['png','jpg','jpeg','webp','gif','mp4','webm','mp3','wav','ogg','m4a','mov']);
 
 function guessContentType(ext: string) {
   const e = ext.toLowerCase();
@@ -36,7 +38,7 @@ function guessContentType(ext: string) {
   return 'application/octet-stream';
 }
 
-// proyección: cuenta de emojis + mi selección (single-choice)
+/** proyección: cuenta de emojis + mi selección (single-choice) */
 function projectReactions<T extends { reactions?: { userId:string; type:ReactionType }[] }>(obj: T, meId?: string) {
   const counts: Record<string, number> = Object.fromEntries(REACTIONS.map(r => [r, 0]));
   for (const r of (obj.reactions || [])) if (counts[r.type] != null) counts[r.type]++;
@@ -52,7 +54,10 @@ export default async function feedRoutes(app: FastifyInstance) {
     '/files',
     { config: { bodyLimit: 50 * 1024 * 1024 } }, // 50 MB
     async (req, reply) => {
-      if (!req.user) return reply.code(401).send({ message: 'login requerido' });
+      // 👉 Mantengo tu auth. Para desarrollo podés permitir anónimos seteando ALLOW_ANON_UPLOADS=1
+      if (!req.user && process.env.ALLOW_ANON_UPLOADS !== '1') {
+        return reply.code(401).send({ message: 'login requerido' });
+      }
 
       const dataUrl = String(req.body?.dataUrl || '');
       if (!dataUrl.startsWith('data:')) return reply.code(400).send({ message: 'dataUrl inválida' });
